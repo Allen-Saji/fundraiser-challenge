@@ -1,14 +1,36 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use solana_program::{
+    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey
+};
+declare_id!("LdAWh3nDWt1TepA9UVDeiMQifkFDoqSfoikNPe3zpnt");
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod state;
+mod instructions;
+mod error;
+mod constants;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+use instructions::*;
+
+#[cfg(not(feature = "no-entrypoint"))]
+solana_program::entrypoint!(process_instruction);
+
+
+pub fn process_instruction(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    if program_id.ne(&ID) {
+        return Err(ProgramError::IncorrectProgramId);
     }
+
+    let (instruction_discriminant, instruction_inner_data) = instruction_data.split_at(1);
+
+    match FundraiserInstruction::try_from(instruction_discriminant[0]).unwrap() {
+        FundraiserInstruction::InitializeInstruction => process_initialize( accounts, instruction_inner_data)?,
+        FundraiserInstruction::CheckerInstruction => check_contributions(program_id,accounts, instruction_data)?,
+        FundraiserInstruction::RefundInstruction => refund_instruction(accounts, instruction_data)?,
+        FundraiserInstruction::ContributeInstruction => contribute(accounts, instruction_inner_data)?
+    }
+
+    Ok(())
 }
